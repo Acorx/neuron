@@ -1,69 +1,79 @@
 # neuron 🧠
 
-> **A new paradigm: Weights from fractal formulas.**
+> **Research: Neural Networks from Mathematical Formulas**
 
-Like the Mandelbrot set (infinite complexity from `z²+c`),
-a Fractal Neural Network generates unlimited weights from 8 numbers.
+Three approaches tested to generate neural network weights from compact representations:
 
-## The Idea
+## Approaches Tested
 
-Traditional NN: Store weights as matrices.
-Fractal NN: Compute weights from a formula.
+### 1. Fractal Neural Networks (Fourier)
+**Formula:** W(i,j,l) = Σₖ αₖ·sin(ωₖᵢ·i + ωₖⱼ·j + ωₖₗ·l + φₖ)
 
-```
-8 parameters → fractal formula → weights for entire network
-```
+- 40 params → 20,746 virtual (519x compression)
+- Inference: 17ms for 80K weights
+- ❌ Training doesn't converge (evolutionary too slow)
 
-The formula has **self-similarity**: weights at different layers
-follow the same pattern at different scales.
+### 2. Neural Cellular Automata
+**Concept:** Evolve a grid using learned rules → grid is the weight matrix
 
-## Results
+- 89 params → 2,794 virtual (31x compression)
+- ❌ Very slow (19s per epoch)
+- ❌ Training doesn't converge
 
-```
-Stored:      8 params (the formula)
-Virtual:  2,307 params (computed on-the-fly)
-Compression: 288x
+### 3. Hypernetworks (v1)
+**Concept:** Small generator network produces weights for larger network
 
-Depth scaling:
-  Depth 1: 8 → 195 (24x)
-  Depth 3: 8 → 2,307 (288x)
-  Depth 8: 8 → 7,587 (948x)
-```
+- 897 params → 4,547 virtual (5x compression)
+- ❌ Training too slow
 
-## Usage
+## What We Learned
 
-```go
-import "github.com/Acorx/neuron/fractal"
+**What works:**
+- ✅ Compression is real and measurable (up to 519x)
+- ✅ Forward pass generates valid weights
+- ✅ Scales linearly with network depth
+- ✅ Zero storage for weights (only formula)
 
-// 8 params define a 5-layer network
-net := fractal.New(
-    2,      // input dim
-    32,     // hidden dim
-    10,     // output dim
-    3,      // depth (number of hidden layers)
-)
+**What doesn't work:**
+- ❌ Evolutionary training doesn't converge fast enough
+- ❌ Weight generation is inherently slower than lookup
+- ❌ The formula needs to be more expressive
 
-// Forward pass (generates all weights on-the-fly)
-output := net.Forward(input)
+**The fundamental tradeoff:**
+- Traditional: 4GB memory, 1ms inference (GPU)
+- Fractal: 32 bytes memory, 17ms inference (CPU)
+- We're trading memory for compute, but compute is also slower
 
-// Train with evolution (no backprop!)
-net.Train(inputs, targets, 100, 50)
-```
+## The Real Challenge
 
-## Why This Is Different
+The bottleneck isn't compression — it's **training convergence**.
 
-| | Traditional | Hypernetwork | **Fractal NN** |
-|---|---|---|---|
-| Weight source | Stored | Generator network | Mathematical formula |
-| Stored params | 1B | 1K | **8** |
-| Compression | 1x | 1000x | **∞ (formula scales)** |
-| Inductive bias | None | Learned | **Self-similarity** |
-| Training | Backprop | Backprop | **Evolution** |
+Evolutionary strategies need thousands of evaluations to find good parameters. Backpropagation needs ~100. That's a 50x gap.
+
+**Possible solutions (not yet implemented):**
+1. Finite-difference gradient estimation (2x slower than backprop, but works)
+2. Hybrid approach: pre-train small network, then compress to fractal
+3. Better search algorithms (CMA-ES, Bayesian optimization)
+4. Hardware acceleration for weight generation (SIMD, GPU)
+
+## Where This Could Work
+
+- Small specialized models (1-10M params)
+- Edge devices without GPUs
+- Extreme compression for deployment
+- Research into alternative learning paradigms
+
+## Where This Won't Work (Yet)
+
+- Large language models (billions of params)
+- Real-time applications needing GPU speed
+- Tasks requiring high accuracy training
 
 ## Philosophy
 
-> "Nature uses fractals for infinite complexity from simple rules.
-> Why not neural networks?"
+> "We proved the concept. The math works. The training is the open problem."
+
+This is research, not a product. The contribution is showing that weight generation from formulas is possible and measurable. The next step is finding better training methods.
 
 ## License
 
