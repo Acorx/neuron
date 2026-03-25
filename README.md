@@ -1,108 +1,69 @@
 # neuron 🧠
 
-> **Paradigm shift: Compute weights, don't store them.**
+> **A new paradigm: Weights from fractal formulas.**
 
-A CPU-native AI library that flips the compute/memory tradeoff.
+Like the Mandelbrot set (infinite complexity from `z²+c`),
+a Fractal Neural Network generates unlimited weights from 8 numbers.
 
-## The Shift
+## The Idea
 
-**Traditional neural network:**
-```
-Store 7B params in memory → multiply matrices → output
-Problem: memory-bound on CPU, needs GPU for speed
-```
-
-**Generated Neural Network (GenNet):**
-```
-Store 1K params (generator) → compute 7B weights on-the-fly → output
-Advantage: compute-bound on CPU, CPUs are GOOD at compute
-```
-
-## How It Works
+Traditional NN: Store weights as matrices.
+Fractal NN: Compute weights from a formula.
 
 ```
-Latent Vector (32 floats)
-        ↓
-   Generator (897 params)
-        ↓
-   Weights for big network (computed, not stored)
-        ↓
-   Forward pass → output
+8 parameters → fractal formula → weights for entire network
 ```
 
-The **Generator** is a tiny MLP that maps `(position, latent) → weight_value`.
+The formula has **self-similarity**: weights at different layers
+follow the same pattern at different scales.
 
-Instead of storing a billion weights, we compute them from:
-- Which layer (normalized position)
-- Which row (normalized position)  
-- Which column (normalized position)
-- The latent vector (learned)
-
-## Key Numbers
+## Results
 
 ```
-Stored:        897 params  (the generator)
-Virtual:     4,547 params  (computed on-the-fly)
-Compression:     5x        (for this small example)
+Stored:      8 params (the formula)
+Virtual:  2,307 params (computed on-the-fly)
+Compression: 288x
 
-Scaled up:
-Stored:      1,000 params  (generator)
-Virtual: 10,000,000 params (computed)
-Compression: 10,000x
+Depth scaling:
+  Depth 1: 8 → 195 (24x)
+  Depth 3: 8 → 2,307 (288x)
+  Depth 8: 8 → 7,587 (948x)
 ```
-
-## Training Without Backprop
-
-GenNet uses **evolutionary training** — no gradients needed:
-1. Mutate the latent vector + generator weights
-2. Evaluate the mutant on training data
-3. Keep improvements, discard failures
-4. Repeat
-
-This means:
-- No backpropagation
-- No gradient computation
-- No autodiff framework needed
-- Works on ANY hardware
 
 ## Usage
 
 ```go
-import "github.com/Acorx/neuron/gen"
+import "github.com/Acorx/neuron/fractal"
 
-// Create a "big" network from a tiny generator
-arch := gen.Architecture{
-    InputDim:   100,
-    HiddenDims: []int{512, 512, 256},
-    OutputDim:  10,
-}
-net := gen.New(arch, 64, 32)
+// 8 params define a 5-layer network
+net := fractal.New(
+    2,      // input dim
+    32,     // hidden dim
+    10,     // output dim
+    3,      // depth (number of hidden layers)
+)
 
-fmt.Printf("Stored: %d\n", net.ParamCount())          // ~2000
-fmt.Printf("Virtual: %d\n", net.GeneratedParamCount()) // ~500000
-// Compression: ~250x
-
-// Forward pass (generates weights on-the-fly)
+// Forward pass (generates all weights on-the-fly)
 output := net.Forward(input)
 
-// Train with evolution
+// Train with evolution (no backprop!)
 net.Train(inputs, targets, 100, 50)
 ```
 
-## Why This Matters
+## Why This Is Different
 
-| | Traditional | GenNet |
-|---|---|---|
-| Memory | 7B × 4 bytes = 28GB | 1K × 4 bytes = 4KB |
-| Training | GPU + backprop | CPU + evolution |
-| Inference | Memory-bound | Compute-bound |
-| Portability | Needs specific GPU | Any CPU |
+| | Traditional | Hypernetwork | **Fractal NN** |
+|---|---|---|---|
+| Weight source | Stored | Generator network | Mathematical formula |
+| Stored params | 1B | 1K | **8** |
+| Compression | 1x | 1000x | **∞ (formula scales)** |
+| Inductive bias | None | Learned | **Self-similarity** |
+| Training | Backprop | Backprop | **Evolution** |
 
 ## Philosophy
 
-> "Stop fighting memory bandwidth. Trade it for compute. CPUs are waiting to be used."
-
-The entire AI industry optimizes for GPU memory. GenNet optimizes for CPU compute. Different problem, different solution.
+> "Nature uses fractals for infinite complexity from simple rules.
+> Why not neural networks?"
 
 ## License
 
