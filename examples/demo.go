@@ -9,32 +9,20 @@ import (
 )
 
 func main() {
-	fmt.Println("🔬 Fourier Neural Networks — Vectorized")
-	fmt.Println("========================================")
-	fmt.Println()
-	fmt.Println("Key innovation: generate ALL weights via matrix ops,")
-	fmt.Println("not one-by-one. Finite-difference gradients.")
+	fmt.Println("🔬 Fourier NN — Convergence Test")
+	fmt.Println("==================================")
 	fmt.Println()
 
-	// Compression
-	fmt.Println("📊 Compression:")
-	fmt.Println()
-	for _, k := range []int{8, 16, 32, 64} {
-		f := fourier.New(10, 32, 10, 3, k)
-		fmt.Printf("   K=%2d: %d alpha → %d virtual (%.0fx)\n",
-			k, f.ParamCount(), f.VirtualParamCount(),
-			float64(f.VirtualParamCount())/float64(f.ParamCount()))
-	}
+	// Small network, many epochs, higher LR
+	net := fourier.New(2, 16, 3, 1, 32)
+	inputs, targets := makeSpirals(90, 3)
 
-	// Classification
-	fmt.Println()
-	fmt.Println("🎯 Classification (K=32, depth 2, hidden 16):")
-	fmt.Println()
-	net := fourier.New(2, 16, 3, 2, 32)
-	inputs, targets := makeSpirals(60, 3)
+	fmt.Printf("Params: %d alpha → %d virtual (%.0fx)\n\n",
+		net.ParamCount(), net.VirtualParamCount(),
+		float64(net.VirtualParamCount())/float64(net.ParamCount()))
 
 	start := time.Now()
-	net.Train(inputs, targets, 20, 0.01)
+	net.Train(inputs, targets, 300, 0.03)
 	fmt.Printf("\n⏱️  %v\n", time.Since(start).Round(time.Millisecond))
 
 	correct := 0
