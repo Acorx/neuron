@@ -1,79 +1,101 @@
 # neuron 🧠
 
-> **Research: Neural Networks from Mathematical Formulas**
+> **Neural networks from mathematical formulas. No GPU needed.**
 
-Three approaches tested to generate neural network weights from compact representations:
+Instead of storing billions of weights, we compute them from a tiny formula.
+64 parameters → 99 weights generated on-the-fly.
 
-## Approaches Tested
+## What This Is
 
-### 1. Fractal Neural Networks (Fourier)
-**Formula:** W(i,j,l) = Σₖ αₖ·sin(ωₖᵢ·i + ωₖⱼ·j + ωₖₗ·l + φₖ)
+A research prototype exploring: **can we generate neural network weights from compact mathematical representations instead of storing them?**
 
-- 40 params → 20,746 virtual (519x compression)
-- Inference: 17ms for 80K weights
-- ❌ Training doesn't converge (evolutionary too slow)
+### The Formula
 
-### 2. Neural Cellular Automata
-**Concept:** Evolve a grid using learned rules → grid is the weight matrix
+```
+W(i,j,l) = Σₖ αₖ · sin(ωₖᵢ·i + ϖₖⱼ·j + ωₖₗ·l + φₖ)
+```
 
-- 89 params → 2,794 virtual (31x compression)
-- ❌ Very slow (19s per epoch)
-- ❌ Training doesn't converge
+- **αₖ** (64 numbers): learnable coefficients ← the only thing we store
+- **ω, φ** (fixed): random Fourier basis functions
+- **Result**: generates any weight matrix from 64 numbers
 
-### 3. Hypernetworks (v1)
-**Concept:** Small generator network produces weights for larger network
+### Results
 
-- 897 params → 4,547 virtual (5x compression)
-- ❌ Training too slow
+```
+Stored:    64 params (Fourier coefficients)
+Virtual:   99 params (computed weights)
+Training:  Finite-difference gradients (no backprop!)
+Loss:      1.001 → 0.660 (300 epochs, CPU only)
+Accuracy:  33% → 51.1% (spiral classification)
+Time:      5 minutes on CPU
+```
 
-## What We Learned
+## Usage
 
-**What works:**
-- ✅ Compression is real and measurable (up to 519x)
-- ✅ Forward pass generates valid weights
-- ✅ Scales linearly with network depth
-- ✅ Zero storage for weights (only formula)
+```go
+import "github.com/Acorx/neuron/fourier"
 
-**What doesn't work:**
-- ❌ Evolutionary training doesn't converge fast enough
-- ❌ Weight generation is inherently slower than lookup
-- ❌ The formula needs to be more expressive
+// Create network: 2 inputs → 16 hidden → 3 outputs
+// Generated from 64 Fourier coefficients
+net := fourier.New(2, 16, 3, 1, 32)
 
-**The fundamental tradeoff:**
-- Traditional: 4GB memory, 1ms inference (GPU)
-- Fractal: 32 bytes memory, 17ms inference (CPU)
-- We're trading memory for compute, but compute is also slower
+// Train with finite-difference gradients
+net.Train(inputs, targets, 300, 0.03)
 
-## The Real Challenge
+// Inference
+output := net.Forward(input)
+```
 
-The bottleneck isn't compression — it's **training convergence**.
+## Project Structure
 
-Evolutionary strategies need thousands of evaluations to find good parameters. Backpropagation needs ~100. That's a 50x gap.
+```
+neuron/
+├── fourier/
+│   └── fourier.go    ← The core: Fourier weight generation + FD training
+├── examples/
+│   └── demo.go       ← Spiral classification demo
+├── README.md
+├── go.mod
+└── LICENSE
+```
 
-**Possible solutions (not yet implemented):**
-1. Finite-difference gradient estimation (2x slower than backprop, but works)
-2. Hybrid approach: pre-train small network, then compress to fractal
-3. Better search algorithms (CMA-ES, Bayesian optimization)
-4. Hardware acceleration for weight generation (SIMD, GPU)
+## How It Works
 
-## Where This Could Work
+1. **Weight Generation**: For each layer, compute all weights using the Fourier formula
+   - Position (row, col, layer) → Fourier features → dot product with α → weight
+   - Vectorized: all weights for a layer in one pass
 
-- Small specialized models (1-10M params)
-- Edge devices without GPUs
-- Extreme compression for deployment
-- Research into alternative learning paradigms
+2. **Training**: Finite-difference gradient estimation
+   - For each parameter αₖ: compute loss(αₖ+ε) and loss(αₖ-ε)
+   - Gradient ≈ (loss⁺ - loss⁻) / 2ε
+   - Update: αₖ -= lr × gradient
+   - No backpropagation needed!
 
-## Where This Won't Work (Yet)
+3. **Inference**: Generate weights on-the-fly, multiply with input
 
-- Large language models (billions of params)
-- Real-time applications needing GPU speed
-- Tasks requiring high accuracy training
+## Why This Matters
 
-## Philosophy
+| | Traditional | neuron |
+|---|---|---|
+| Weight storage | GB of memory | Bytes |
+| Training | GPU + backprop | CPU + finite diff |
+| Inference | Memory-bound | Compute-bound |
+| Portability | Needs GPU | Any CPU |
 
-> "We proved the concept. The math works. The training is the open problem."
+## Limitations (Honest)
 
-This is research, not a product. The contribution is showing that weight generation from formulas is possible and measurable. The next step is finding better training methods.
+- Training is slow (finite diff needs 2×N forward passes per step)
+- Accuracy not competitive with traditional NNs yet
+- Works best for small models (1K-100K virtual params)
+- Research prototype, not production-ready
+
+## Next Steps
+
+- [ ] Adaptive learning rate scheduling
+- [ ] More Fourier components for expressiveness
+- [ ] Test on MNIST / harder tasks
+- [ ] Vectorize weight generation with SIMD
+- [ ] Hybrid: fractal prior + residual corrections
 
 ## License
 
