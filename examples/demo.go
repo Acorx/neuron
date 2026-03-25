@@ -5,58 +5,45 @@ import (
 	"math"
 	"time"
 
-	"github.com/Acorx/neuron/neural"
+	"github.com/Acorx/neuron/fourier"
 )
 
 func main() {
-	fmt.Println("🧬 Neural Cellular Automata for AI")
-	fmt.Println("====================================")
+	fmt.Println("🔬 Fourier Neural Networks — Vectorized")
+	fmt.Println("========================================")
 	fmt.Println()
-	fmt.Println("Conway's Game of Life: 2 rules → infinite complexity")
-	fmt.Println("Neural CA: learned rule → weight patterns")
-	fmt.Println("Only the RULE is stored. Weights are evolved.")
+	fmt.Println("Key innovation: generate ALL weights via matrix ops,")
+	fmt.Println("not one-by-one. Finite-difference gradients.")
 	fmt.Println()
 
-	// === Compression ===
-	fmt.Println("📊 Rule Size vs Generated Weights:")
+	// Compression
+	fmt.Println("📊 Compression:")
 	fmt.Println()
-	for _, rh := range []int{2, 4, 8, 16} {
-		ca := neural.NewCA(10, 32, 10, 3, rh)
-		fmt.Printf("   Rule hidden=%2d: %d rule params → %d virtual (%.0fx)\n",
-			rh, ca.ParamCount(), ca.VirtualParamCount(),
-			float64(ca.VirtualParamCount())/float64(ca.ParamCount()))
+	for _, k := range []int{8, 16, 32, 64} {
+		f := fourier.New(10, 32, 10, 3, k)
+		fmt.Printf("   K=%2d: %d alpha → %d virtual (%.0fx)\n",
+			k, f.ParamCount(), f.VirtualParamCount(),
+			float64(f.VirtualParamCount())/float64(f.ParamCount()))
 	}
 
-	// === Classification ===
+	// Classification
 	fmt.Println()
-	fmt.Println("🎯 Classification (rule hidden=8, depth 3):")
+	fmt.Println("🎯 Classification (K=32, depth 2, hidden 16):")
 	fmt.Println()
-	ca := neural.NewCA(2, 16, 3, 3, 8)
+	net := fourier.New(2, 16, 3, 2, 32)
 	inputs, targets := makeSpirals(60, 3)
 
 	start := time.Now()
-	ca.Train(inputs, targets, 30, 40)
+	net.Train(inputs, targets, 20, 0.01)
 	fmt.Printf("\n⏱️  %v\n", time.Since(start).Round(time.Millisecond))
 
 	correct := 0
 	for i, input := range inputs {
-		if argmax(ca.Forward(input)) == argmax(targets[i]) {
+		if argmax(net.Forward(input)) == argmax(targets[i]) {
 			correct++
 		}
 	}
 	fmt.Printf("📊 Accuracy: %.1f%% (%d/%d)\n", float64(correct)/float64(len(inputs))*100, correct, len(inputs))
-
-	// === Inference speed ===
-	fmt.Println()
-	fmt.Println("⚡ Inference:")
-	fmt.Println()
-	ca2 := neural.NewCA(10, 32, 10, 3, 4)
-	in := make([]float32, 10)
-	start = time.Now()
-	for i := 0; i < 500; i++ {
-		ca2.Forward(in)
-	}
-	fmt.Printf("   %v per pass (%d virtual params)\n", time.Since(start)/500, ca2.VirtualParamCount())
 }
 
 func makeSpirals(n, c int) ([][]float32, [][]float32) {
