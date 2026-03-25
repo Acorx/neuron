@@ -1,4 +1,4 @@
-// neuron demo — Train a classifier on CPU
+// neuron demo — Generated Neural Networks (fixed)
 package main
 
 import (
@@ -6,76 +6,66 @@ import (
 	"math"
 	"time"
 
-	"github.com/Acorx/neuron/nn"
-	"github.com/Acorx/neuron/optim"
-	"github.com/Acorx/neuron/tensor"
-	"github.com/Acorx/neuron/train"
+	"github.com/Acorx/neuron/gen"
 )
 
 func main() {
-	fmt.Println("🧠 neuron — CPU-Native AI Training Library")
-	fmt.Println("==========================================")
+	fmt.Println("🧠 neuron — Generated Neural Networks")
+	fmt.Println("======================================")
+	fmt.Println()
+	fmt.Println("PARADIGM: Compute weights, don't store them")
 	fmt.Println()
 
-	inputDim := 2
-	hiddenDim := 64
-	outputDim := 3
-	numSamples := 300
-
-	inputs, targets := generateSpirals(numSamples, outputDim)
-
-	model := nn.NewSimpleModel(inputDim, hiddenDim, outputDim)
-	fmt.Printf("Model: %d → %d → %d (%d parameters)\n\n",
-		inputDim, hiddenDim, outputDim, model.ParamCount())
-
-	trainer := train.Trainer{
-		Model:     model,
-		Optim:     optim.NewSignSGD(0.01),
-		Epochs:    50,
-		Verbose:   false,
-		QATStart:  30,
-		GroupSize: 32,
+	// Big generated network, tiny generator
+	arch := gen.Architecture{
+		InputDim:   2,
+		HiddenDims: []int{64, 64},
+		OutputDim:  3,
 	}
+	net := gen.New(arch, 32, 16) // latent=32, gen_hidden=16
 
+	fmt.Printf("Stored params (generator):  %d\n", net.ParamCount())
+	fmt.Printf("Generated params (virtual): %d\n", net.GeneratedParamCount())
+	fmt.Printf("Compression: %.0fx\n\n", float64(net.GeneratedParamCount())/float64(net.ParamCount()))
+
+	// Generate data
+	inputs, targets := generateSpirals(60, 3)
+
+	// Train
 	start := time.Now()
-	trainer.Train(inputs, targets, inputDim, outputDim)
-	fmt.Printf("\n⏱️  Total: %v\n", time.Since(start).Round(time.Millisecond))
+	net.Train(inputs, targets, 20, 20)
+	fmt.Printf("\n⏱️  %v\n", time.Since(start).Round(time.Millisecond))
 
+	// Test
 	correct := 0
 	for i, input := range inputs {
-		x := tensor.New(input, 1, inputDim)
-		logits := model.Forward(x)
-		pred := argmax(logits.Data)
-		if pred == targets[i] {
+		output := net.Forward(input)
+		pred := argmax(output)
+		if pred == argmax(targets[i]) {
 			correct++
 		}
 	}
-	fmt.Printf("📊 Accuracy: %.1f%% (%d/%d)\n", float64(correct)/float64(numSamples)*100, correct, numSamples)
-
-	fmt.Println()
-	train.Benchmark()
+	fmt.Printf("📊 Accuracy: %.1f%% (%d/%d)\n", float64(correct)/float64(len(inputs))*100, correct, len(inputs))
 }
 
-func generateSpirals(n, numClasses int) ([][]float32, []int) {
+func generateSpirals(n, classes int) ([][]float32, [][]float32) {
 	var inputs [][]float32
-	var targets []int
-	perClass := n / numClasses
-
-	for c := 0; c < numClasses; c++ {
+	var targets [][]float32
+	perClass := n / classes
+	for c := 0; c < classes; c++ {
 		for i := 0; i < perClass; i++ {
 			r := float32(i) / float32(perClass) * 5
-			t := float32(c)*2*float32(math.Pi)/float32(numClasses) + float32(i)*0.1
-			x := r*cos(t) + noise()
-			y := r*sin(t) + noise()
+			t := float32(c)*2*float32(math.Pi)/float32(classes) + float32(i)*0.1
+			x := r*float32(math.Cos(float64(t))) + noise()
+			y := r*float32(math.Sin(float64(t))) + noise()
 			inputs = append(inputs, []float32{x, y})
-			targets = append(targets, c)
+			target := make([]float32, classes)
+			target[c] = 1.0
+			targets = append(targets, target)
 		}
 	}
 	return inputs, targets
 }
-
-func cos(x float32) float32 { return float32(math.Cos(float64(x))) }
-func sin(x float32) float32 { return float32(math.Sin(float64(x))) }
 
 func noise() float32 {
 	return (float32(time.Now().UnixNano()%1000)/1000.0 - 0.5) * 0.2
